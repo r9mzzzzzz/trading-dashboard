@@ -1,0 +1,1049 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="dark"><meta name="theme-color" content="#0a0a0c">
+<title>Quant Lab · NQ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..700&display=swap" rel="stylesheet">
+<!--
+  Mise en page du dashboard. dashboard.py remplace le marqueur DATA (const D=…) par les données JSON et écrit dashboard.html.
+  Tout est dans ce fichier : styles, graphiques SVG, verre liquide (fin de page). Aucune image, aucune dépendance.
+-->
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#0a0a0c;--card:#141417;--card2:#1c1c20;--card3:#26262b;
+  --line:rgba(255,255,255,.07);--line2:rgba(255,255,255,.12);
+  --text:#f5f5f7;--text2:#c7c7cc;--muted:#8e8e93;--faint:#5a5a60;
+  --green:#30d158;--red:#ff453a;--orange:#ff9f0a;
+  /* séries des graphiques (palette validée sur fond sombre) */
+  --s1:#2a9cca;--s2:#d07a00;--s3:#b360ea;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter",system-ui,"Segoe UI",sans-serif;
+  --font-d:-apple-system,BlinkMacSystemFont,"SF Pro Display","Inter",system-ui,"Segoe UI",sans-serif;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  --r:18px;--side:248px;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 var(--font);font-optical-sizing:auto;
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+button{font:inherit;color:inherit}
+.num{font-variant-numeric:tabular-nums}
+.pos{color:var(--green)}.neg{color:var(--red)}.mut{color:var(--muted)}
+
+/* ---------- Structure ---------- */
+.app{display:grid;grid-template-columns:var(--side) minmax(0,1fr);min-height:100vh}
+aside{position:sticky;top:0;height:100vh;padding:22px 14px;border-right:1px solid var(--line);
+  display:flex;flex-direction:column;gap:22px;background:linear-gradient(180deg,#0e0e11,#0a0a0c)}
+.brand{display:flex;align-items:center;gap:10px;padding:0 8px}
+.logo{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;
+  background:linear-gradient(145deg,#2c2c31,#17171a);box-shadow:inset 0 0 0 1px var(--line2)}
+.logo svg{width:16px;height:16px}
+.brand b{font:600 15px/1.1 var(--font-d);white-space:nowrap;letter-spacing:-.02em}
+.brand small{display:block;color:var(--muted);font-size:11.5px;font-weight:400;letter-spacing:0}
+.sec-t{font-size:11px;font-weight:600;color:var(--faint);text-transform:uppercase;letter-spacing:.08em;padding:0 10px;margin-bottom:6px}
+.strat{display:flex;gap:11px;width:100%;text-align:left;background:none;border:0;padding:10px;border-radius:12px;
+  cursor:pointer;transition:background .15s}
+.strat:hover{background:rgba(255,255,255,.04)}
+.strat.on{background:var(--card2);box-shadow:inset 0 0 0 1px var(--line)}
+.strat .dot{flex:none;margin-top:6px}
+.strat span.t{display:block;font-weight:550;letter-spacing:-.01em}
+.strat small{display:block;color:var(--muted);font-size:12px;line-height:1.35;margin-top:2px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--faint);display:inline-block}
+.dot.live{background:var(--green);box-shadow:0 0 0 3px rgba(48,209,88,.16)}
+.side-foot{margin-top:auto;padding:0 10px;color:var(--faint);font-size:11.5px;line-height:1.5}
+
+main{min-width:0}
+.topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:14px;
+  margin:10px 14px 0;padding:10px 12px 10px 18px;border-radius:16px;
+  background:rgba(22,22,26,.72);backdrop-filter:blur(18px) saturate(1.6);-webkit-backdrop-filter:blur(18px) saturate(1.6);
+  box-shadow:inset 0 0 0 1px var(--line),0 8px 30px rgba(0,0,0,.35)}
+.topbar.verre-liquide{background:rgba(22,22,26,.5)}
+.topbar .cur{font:600 14px var(--font-d);letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar .gen{margin-left:auto;color:var(--muted);font-size:12px;white-space:nowrap}
+.tabs{display:none}
+.wrap{max-width:1180px;margin:0 auto;padding:26px 28px 48px;display:flex;flex-direction:column;gap:18px}
+
+/* ---------- En-tête de stratégie ---------- */
+.hero{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px;align-items:end;padding:18px 4px 6px}
+.pill{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:550;padding:5px 11px 5px 9px;border-radius:999px;
+  background:var(--card2);box-shadow:inset 0 0 0 1px var(--line);color:var(--text2)}
+.pill.live{color:#7ee59a;background:rgba(48,209,88,.1);box-shadow:inset 0 0 0 1px rgba(48,209,88,.22)}
+.hero h1{margin:14px 0 6px;font:700 clamp(30px,4.4vw,46px)/1.02 var(--font-d);letter-spacing:-.035em}
+.hero p{margin:0;color:var(--muted);max-width:60ch}
+.big{text-align:right}
+.big b{display:block;font:700 clamp(30px,4vw,44px)/1 var(--font-d);letter-spacing:-.03em}
+.big span{color:var(--muted);font-size:12.5px}
+
+/* ---------- Cartes ---------- */
+.card{background:var(--card);border-radius:var(--r);padding:20px 22px;box-shadow:inset 0 0 0 1px var(--line)}
+.card-h{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.card-h h2{margin:0;font:600 17px/1.2 var(--font-d);letter-spacing:-.02em}
+.card-h .sp{flex:1}
+.sub{color:var(--muted);font-size:12.5px;margin:0 0 10px}
+.grid2{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:22px}
+
+.rules{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}
+.rules li{display:flex;gap:12px;background:var(--card2);border-radius:12px;padding:12px 14px;color:var(--text2);font-size:13.5px;line-height:1.45}
+.rules li i{font-style:normal;flex:none;width:22px;height:22px;border-radius:7px;display:grid;place-items:center;
+  background:var(--card3);color:var(--muted);font-size:11.5px;font-weight:600}
+
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.kpi{background:var(--card);border-radius:16px;padding:16px 18px;box-shadow:inset 0 0 0 1px var(--line)}
+.card .kpi{background:var(--card2);box-shadow:none}
+.kpi>span{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}
+.kpi b{display:block;font:650 24px/1.1 var(--font-d);letter-spacing:-.025em}
+.kpi small{display:block;color:var(--faint);font-size:11.5px;margin-top:4px}
+
+.seg{display:inline-flex;background:var(--card2);border-radius:10px;padding:3px;gap:2px;box-shadow:inset 0 0 0 1px var(--line)}
+.seg button{background:none;border:0;color:var(--muted);padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12.5px;font-weight:550;transition:.15s}
+.seg button:hover{color:var(--text)}
+.seg button.on{background:var(--card3);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.4)}
+
+/* ---------- Calendrier ---------- */
+.cal-nav{display:flex;align-items:center;gap:8px;margin-bottom:14px}
+.cal-nav b{font:600 15px var(--font-d);letter-spacing:-.01em;text-transform:capitalize;min-width:130px;text-align:center}
+.nav{width:30px;height:30px;border-radius:9px;border:0;background:var(--card2);cursor:pointer;display:grid;place-items:center;
+  box-shadow:inset 0 0 0 1px var(--line);font-size:16px;line-height:1}
+.nav:disabled{opacity:.3;cursor:default}
+.cal{display:grid;grid-template-columns:repeat(5,minmax(0,1fr)) minmax(0,.9fr);gap:6px}
+.cal .hd{color:var(--faint);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;text-align:center;padding-bottom:2px}
+.cal .c{background:var(--card2);border-radius:10px;min-height:70px;padding:7px 9px;position:relative}
+.cal .c .n{color:var(--muted);font-size:11.5px}
+.cal .c .v{position:absolute;right:9px;bottom:7px;font:600 14.5px var(--font-d);letter-spacing:-.01em}
+.cal .c.empty{background:transparent}
+.cal .c.wk{background:transparent;box-shadow:inset 0 0 0 1px var(--line)}
+.cal .c.wk .v{font-size:13.5px}
+.month-tot{font:600 14px var(--font-d)}
+
+/* ---------- Graphiques ---------- */
+.chart{position:relative;width:100%}
+.chart svg{display:block;overflow:visible}
+.chart text{fill:var(--faint);font:11px var(--font)}
+.tip{position:absolute;pointer-events:none;background:rgba(38,38,43,.94);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  border-radius:10px;padding:7px 10px;font-size:12px;line-height:1.4;white-space:nowrap;box-shadow:0 6px 20px rgba(0,0,0,.45),inset 0 0 0 1px var(--line2);
+  opacity:0;transition:opacity .12s;transform:translate(-50%,calc(-100% - 12px))}
+.tip b{font-weight:600}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:10px}
+.legend i{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
+.legend i.area{height:10px;border-radius:3px}
+.divider{height:1px;background:var(--line);margin:20px 0}
+
+/* ---------- Tableau ---------- */
+.table-wrap{overflow-x:auto;margin:0 -6px}
+table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+th,td{padding:9px 10px;text-align:right;white-space:nowrap}
+th{color:var(--faint);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--line)}
+td{border-bottom:1px solid rgba(255,255,255,.04);color:var(--text2)}
+tr:last-child td{border-bottom:0}
+tbody tr:hover td{background:rgba(255,255,255,.025)}
+td:first-child,th:first-child{text-align:left}
+.side{display:inline-block;font-size:11px;font-weight:650;letter-spacing:.04em;padding:2px 8px;border-radius:6px}
+.side.b{color:#7ee59a;background:rgba(48,209,88,.12)}.side.s{color:#ff8a82;background:rgba(255,69,58,.12)}
+.r-chip{font-weight:600}
+
+/* ---------- Lucid ---------- */
+.bar{display:flex;gap:2px;height:30px;border-radius:9px;overflow:hidden;margin:10px 0 2px}
+.bar div{display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:650;color:#0a0a0c;min-width:0}
+.note{color:var(--muted);font-size:12.5px;line-height:1.55;margin:12px 0 0}
+.empty-state{color:var(--muted);font-size:13px;background:var(--card2);border-radius:12px;padding:14px 16px}
+code{font-family:var(--mono);font-size:12px;background:var(--card3);padding:1px 6px;border-radius:5px;color:var(--text2)}
+footer{color:var(--faint);font-size:12px;text-align:center;padding:8px 0 0}
+
+/* ---------- Téléphone ---------- */
+@media (max-width:900px){
+  .app{grid-template-columns:1fr}
+  aside{display:none}
+  .topbar{flex-direction:column;align-items:stretch;gap:10px;margin:8px 10px 0;padding:12px}
+  .topbar .row{display:flex;align-items:center;gap:10px}
+  .topbar .cur{display:none}
+  .topbar .gen{font-size:11px}
+  .cal-nav b{min-width:0;flex:1}
+  .cal-nav .lbl{display:none}
+  .tabs{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:0 -2px}
+  .tabs::-webkit-scrollbar{display:none}
+  .tabs button{flex:none;border:0;background:rgba(255,255,255,.06);border-radius:999px;padding:7px 13px;font-size:12.5px;font-weight:550;
+    color:var(--text2);display:flex;align-items:center;gap:7px;cursor:pointer}
+  .tabs button.on{background:var(--text);color:#0a0a0c}
+  .tabs button.on .dot:not(.live){background:#0a0a0c}
+  .wrap{padding:16px 16px 40px;gap:14px}
+  .hero{grid-template-columns:1fr;gap:14px;padding-top:10px}
+  .big{text-align:left}
+  .card{padding:16px}
+  .grid2{grid-template-columns:1fr}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .cal{gap:4px}
+  .cal .c{min-height:54px;padding:5px 6px;border-radius:8px}
+  .cal .c .v{font-size:11.5px;right:5px;bottom:5px}
+  .cal .hd{font-size:9.5px;letter-spacing:.02em}
+}
+@media (min-width:901px){.topbar .row{display:contents}.topbar .brand{display:none}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style></head><body>
+<div class="app">
+  <aside>
+    <div class="brand"><span class="logo"><svg viewBox="0 0 16 16" fill="none" stroke="#f5f5f7" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 12.5 5.5 8l3 2.5 6-7"/><path d="M10.5 3.5h4v4"/></svg></span>
+      <div><b>Quant Lab</b><small>NQ / MNQ · 5 minutes</small></div></div>
+    <div><div class="sec-t">Stratégies</div><div id="side"></div></div>
+    <div class="side-foot" id="side-foot"></div>
+  </aside>
+  <main>
+    <div class="topbar" id="topbar">
+      <div class="row">
+        <div class="brand"><span class="logo"><svg viewBox="0 0 16 16" fill="none" stroke="#f5f5f7" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 12.5 5.5 8l3 2.5 6-7"/><path d="M10.5 3.5h4v4"/></svg></span><div><b>Quant Lab</b></div></div>
+        <span class="cur" id="cur"></span><span class="gen" id="gen"></span>
+      </div>
+      <div class="tabs" id="tabs"></div>
+    </div>
+    <div class="wrap" id="main"></div>
+  </main>
+</div>
+<script>
+const D=__DATA__;
+const $=s=>document.querySelector(s);
+const fmt=(x,d=1)=>(x>0?'+':x<0?'−':'')+Math.abs(x).toFixed(d).replace('.',',');
+const fr=(x,d=0)=>x.toLocaleString('fr-FR',{minimumFractionDigits:d,maximumFractionDigits:d});
+const cls=x=>x>0?'pos':x<0?'neg':'mut';
+const live=s=>!/^abandonn/i.test(s.status);
+let S=D.strategies[0],calSrc='bt',calMonth=null,risk=D.risks[0],charts=[];
+
+function nav(){
+  $('#side').innerHTML=D.strategies.map(s=>`<button class="strat ${s===S?'on':''}" data-id="${s.id}">
+    <span class="dot ${live(s)?'live':''}"></span><span><span class="t">${s.name}</span><small>${s.status}</small></span></button>`).join('');
+  $('#tabs').innerHTML=D.strategies.map(s=>`<button class="${s===S?'on':''}" data-id="${s.id}"><span class="dot ${live(s)?'live':''}"></span>${s.name}</button>`).join('');
+  document.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>{S=D.strategies.find(s=>s.id===b.dataset.id);calMonth=null;calSrc='bt';render();scrollTo({top:0})});
+  $('#cur').textContent=S.name;
+  $('#gen').textContent='Mis à jour le '+D.generated.replace(' ',' à ');
+  $('#side-foot').innerHTML=`Généré le ${D.generated}<br>Backtest HistData · coûts inclus`;
+}
+
+function fwdDays(){ // séances du paper trading : R théorique, R réel si saisi
+  return D.forward.map(r=>{const R=r.R_net===''||r.R_net==null?null:+r.R_net;
+    const real=r.reel_pts!==''&&r.reel_pts!=null&&R!==null?(+r.reel_pts)/(+r.largeur_pts):null;
+    return {d:r.date,R:R,real:real,row:r}});
+}
+
+function hero(){
+  const s2=S.stats['2021-2026'];
+  return `<section class="hero"><div><span class="pill ${live(S)?'live':''}"><span class="dot ${live(S)?'live':''}"></span>${live(S)?'En test réel':'Archivée'}</span>
+    <h1>${S.name}</h1><p>${S.status}</p></div>
+    ${s2?`<div class="big"><b class="num ${cls(s2.tot)}">${fmt(s2.tot)} R</b><span>cumul 2021-2026 · ${fr(s2.n)} trades</span></div>`:''}</section>`;
+}
+
+function kpis(){
+  const b=S.stats,f=fwdDays().filter(x=>x.R!==null);
+  const card=(v,l,s='')=>`<div class="kpi"><span>${l}</span><b class="num">${v}</b>${s?`<small>${s}</small>`:''}</div>`;
+  const s1=b['2010-2020'],s2=b['2021-2026'];
+  let h=card(s1?fr(s1.pf,2):'—','Profit factor 2010-20',s1?fr(s1.n)+' trades':'')
+   +card(s2?fr(s2.pf,2):'—','Profit factor 2021-26',s2?fr(s2.n)+' trades':'')
+   +card(s2?(s2.win*100).toFixed(0)+' %':'—','Jours gagnants 2021-26')
+   +card(s2?fr(s2.dd,1)+' R':'—','Drawdown max 2021-26');
+  if(S.id==='orb'){const tot=f.reduce((a,x)=>a+x.R,0);h+=card(f.length,'Trades en paper trading')+card(`<span class="${cls(tot)}">${fmt(tot)} R</span>`,'Cumul paper trading')}
+  return `<div class="kpis">${h}</div>`;
+}
+
+function calendar(){
+  const src=calSrc==='fw'?fwdDays().map(x=>[x.d,x.R===null?0:x.R,x.R===null?0:1]):S.series;
+  const map=Object.fromEntries(src.map(r=>[r[0],r]));
+  const months=[...new Set(src.map(r=>r[0].slice(0,7)))].sort();
+  if(!months.length) return `<div class="empty-state">Aucune séance dans le journal pour l'instant : lancez <code>python orb_daily.py --review</code> après vos premières séances.</div>`;
+  if(!calMonth||!months.includes(calMonth)) calMonth=months[months.length-1];
+  const [y,m]=calMonth.split('-').map(Number);const first=new Date(y,m-1,1);const nd=new Date(y,m,0).getDate();
+  let cells=['Lun','Mar','Mer','Jeu','Ven','Semaine'].map(x=>`<div class="hd">${x}</div>`).join('');
+  let wd=(first.getDay()+6)%7, week=0, monthTot=0, line=[];
+  const flush=()=>{while(line.length<5) line.push('<div class="c empty"></div>');
+    cells+=line.join('')+`<div class="c wk"><span class="n">total</span><span class="v num ${cls(week)}">${week?fmt(week):''}</span></div>`;line=[];week=0};
+  for(let k=0;k<wd&&k<5;k++) line.push('<div class="c empty"></div>');
+  for(let dd=1;dd<=nd;dd++){const dt=new Date(y,m-1,dd),w=(dt.getDay()+6)%7;if(w>4){if(w===6&&line.length) flush();continue}
+    const key=`${calMonth}-${String(dd).padStart(2,'0')}`,r=map[key];
+    let v='',bg='',tt='';if(r){const x=r[1];week+=x;monthTot+=x;v=r[2]?fmt(x,2):'—';tt=r[2]?`${key} : ${fmt(x,2)} R`:`${key} : pas de trade`;
+      const a=Math.min(1,Math.abs(x)/2.5);bg=r[2]?`background:${x>0?`rgba(48,209,88,${.14+.46*a})`:x<0?`rgba(255,69,58,${.14+.46*a})`:'var(--card2)'}`:''}
+    line.push(`<div class="c" style="${bg}" ${tt?`title="${tt}"`:''}><span class="n">${dd}</span><span class="v num">${v}</span></div>`);if(line.length===5) flush()}
+  if(line.length) flush();
+  const i=months.indexOf(calMonth);
+  return `<div class="cal-nav"><button class="nav" id="pm" ${i===0?'disabled':''} aria-label="Mois précédent">‹</button>
+  <b>${first.toLocaleDateString('fr-FR',{month:'long',year:'numeric'})}</b>
+  <button class="nav" id="nm" ${i===months.length-1?'disabled':''} aria-label="Mois suivant">›</button><span style="flex:1"></span>
+  <span class="month-tot num ${cls(monthTot)}">${fmt(monthTot)} R <span class="mut lbl" style="font-weight:400">sur le mois</span></span></div><div class="cal">${cells}</div>`;
+}
+
+/* ---------- Graphiques SVG (dessinés à la largeur réelle, redessinés au redimensionnement) ---------- */
+function chart(spec){charts.push(spec);return `<div class="chart" id="ch${charts.length-1}" style="height:${spec.h||240}px"></div>`}
+function ticks(a,b,n=4){const raw=(b-a)/n||1,p=Math.pow(10,Math.floor(Math.log10(raw))),st=[1,2,2.5,5,10].map(k=>k*p).find(k=>k>=raw);
+  const out=[];for(let v=Math.ceil(a/st)*st;v<=b+1e-9;v+=st) out.push(+v.toFixed(6));return out}
+function draw(el,o){
+  const W=el.clientWidth,H=o.h||240,L=44,R=10,T=10,B=o.xlabels?24:8;if(!W) return;
+  let xs=[],ys=[];
+  o.series.forEach(s=>s.pts.forEach(p=>{xs.push(p[0]);ys.push(p[1])}));(o.band||[]).forEach(p=>{xs.push(p[0]);ys.push(p[1],p[3])});
+  (o.hlines||[]).forEach(h=>ys.push(h.y));if(!xs.length){el.innerHTML='';return}
+  const x0=Math.min(...xs),x1=Math.max(...xs);let y0=Math.min(...ys,0),y1=Math.max(...ys,0);const pad=(y1-y0)*.06||1;y0-=pad;y1+=pad;
+  const X=x=>L+(x-x0)/((x1-x0)||1)*(W-L-R),Y=y=>T+(y1-y)/((y1-y0)||1)*(H-T-B);
+  const id='g'+Math.random().toString(36).slice(2,8);
+  let g=`<defs>${o.series.filter(s=>s.area).map((s,k)=>`<linearGradient id="${id}${k}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${s.c}" stop-opacity=".32"/><stop offset="1" stop-color="${s.c}" stop-opacity="0"/></linearGradient>`).join('')}</defs>`;
+  ticks(y0,y1).forEach(v=>g+=`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="${v===0?'rgba(255,255,255,.16)':'rgba(255,255,255,.05)'}"/><text x="${L-8}" y="${Y(v)+4}" text-anchor="end">${o.yfmt?o.yfmt(v):fr(v)}</text>`);
+  (o.vlines||[]).forEach(v=>g+=`<line x1="${X(v.x)}" x2="${X(v.x)}" y1="${T}" y2="${H-B}" stroke="rgba(255,255,255,.14)" stroke-dasharray="3 4"/><text x="${X(v.x)+6}" y="${T+11}">${v.t}</text>`);
+  if(o.band){const b=o.band;g+=`<path d="M${b.map(p=>X(p[0])+','+Y(p[3])).join('L')}L${b.slice().reverse().map(p=>X(p[0])+','+Y(p[1])).join('L')}Z" fill="var(--s3)" fill-opacity=".14"/>`
+    +`<path d="M${b.map(p=>X(p[0])+','+Y(p[2])).join('L')}" fill="none" stroke="var(--s3)" stroke-width="1.5" stroke-dasharray="4 4"/>`}
+  (o.hlines||[]).forEach(h=>g+=`<line x1="${L}" x2="${W-R}" y1="${Y(h.y)}" y2="${Y(h.y)}" stroke="${h.c}" stroke-width="1.5" stroke-dasharray="5 4"/><text x="${W-R}" y="${Y(h.y)-6}" text-anchor="end" style="fill:${h.c}">${h.t}</text>`);
+  o.series.forEach((s,k)=>{if(!s.pts.length) return;const d=s.pts.map(p=>X(p[0]).toFixed(1)+','+Y(p[1]).toFixed(1)).join('L');
+    if(s.area) g+=`<path d="M${X(s.pts[0][0])},${Y(0)}L${d}L${X(s.pts[s.pts.length-1][0])},${Y(0)}Z" fill="url(#${id}${o.series.filter(z=>z.area).indexOf(s)})"/>`;
+    g+=`<path d="M${d}" fill="none" stroke="${s.c}" stroke-width="${s.w||2}" stroke-linejoin="round" stroke-linecap="round" opacity="${s.o||1}"/>`});
+  let last=-1e9;(o.xlabels||[]).forEach(l=>{const px=X(l[0]);if(px-last<46||px>W-R-14) return;last=px;g+=`<text x="${px}" y="${H-6}" text-anchor="middle">${l[1]}</text>`});
+  el.innerHTML=`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${g}<g class="hv" style="display:none"><line y1="${T}" y2="${H-B}" stroke="rgba(255,255,255,.35)"/><circle r="4.5" stroke="#141417" stroke-width="2"/></g></svg>`+(o.tip?'<div class="tip"></div>':'');
+  if(!o.tip) return;
+  const m=o.series[0].pts,hv=el.querySelector('.hv'),ln=hv.firstChild,dt=hv.lastChild,tip=el.querySelector('.tip');dt.setAttribute('fill',o.series[0].c);
+  const move=e=>{const r=el.getBoundingClientRect(),cx=(e.touches?e.touches[0].clientX:e.clientX)-r.left;
+    const xv=x0+(cx-L)/(W-L-R)*(x1-x0);let lo=0,hi=m.length-1;while(hi-lo>1){const md=(lo+hi)>>1;m[md][0]<xv?lo=md:hi=md}
+    const k=Math.abs(m[lo][0]-xv)<Math.abs(m[hi][0]-xv)?lo:hi,p=m[k],px=X(p[0]),py=Y(p[1]);
+    hv.style.display='';ln.setAttribute('x1',px);ln.setAttribute('x2',px);dt.setAttribute('cx',px);dt.setAttribute('cy',py);
+    tip.innerHTML=o.tip(k);tip.style.opacity=1;tip.style.left=Math.min(Math.max(px,tip.offsetWidth/2),W-tip.offsetWidth/2)+'px';tip.style.top=Math.max(py,T+44)+'px'};
+  const out=()=>{hv.style.display='none';tip.style.opacity=0};
+  el.onmousemove=move;el.ontouchmove=move;el.ontouchstart=move;el.onmouseleave=out;el.ontouchend=out;
+}
+function drawAll(){charts.forEach((c,i)=>{const el=document.getElementById('ch'+i);if(el) draw(el,c)})}
+
+function perf(){
+  let cum=0;const pts=S.series.map((r,i)=>[i,cum+=r[1]]);
+  const years=[];S.series.forEach((r,i)=>{if(i===0||r[0].slice(0,4)!==S.series[i-1][0].slice(0,4)) years.push([i,r[0].slice(0,4)])});
+  const split=S.series.findIndex(r=>r[0]>='2021-01-01');
+  let h=`<p class="sub">Backtest : cumul en R, coûts inclus (0,0075 % du prix)</p>`
+    +chart({series:[{pts,c:'var(--s1)',area:true}],xlabels:years,h:260,vlines:split>0?[{x:split,t:'2021'}]:[],yfmt:v=>fr(v)+' R',
+      tip:k=>`<span class="mut">${S.series[k][0]}</span><br><b class="num">${fmt(pts[k][1])} R</b> <span class="num ${cls(S.series[k][1])}">(${S.series[k][2]?fmt(S.series[k][1],2):'pas de trade'})</span>`});
+  if(S.band){const f=fwdDays().filter(x=>x.R!==null);let a=0,b=0;
+    const th=[[0,0]].concat(f.map((x,i)=>[i+1,a+=x.R])),re=[[0,0]].concat(f.filter(x=>x.real!==null).map((x,i)=>[i+1,b+=x.real]));
+    const n=Math.max(40,f.length+10),band=S.band.slice(0,n+1).map((p,i)=>[i,...p]);
+    h+=`<div class="divider"></div><p class="sub">Paper trading : cumul en R par trade, comparé à la fourchette attendue (5 % – 95 % des tirages 2021-2026)</p>`
+      +chart({series:[{pts:th,c:'var(--s1)',w:2.5},{pts:re,c:'var(--s2)',w:2.5}],band,h:220,yfmt:v=>fr(v)+' R',
+        xlabels:band.filter(p=>p[0]%10===0).map(p=>[p[0],p[0]?p[0]+' tr.':'0'])})
+      +`<div class="legend"><span><i style="background:var(--s1)"></i>théorique (règles)</span><span><i style="background:var(--s2)"></i>réel (colonne reel_pts)</span><span><i style="background:var(--s3)"></i>médiane attendue</span><span><i class="area" style="background:var(--s3);opacity:.35"></i>fourchette 5-95 %</span></div>`
+      +(f.length?'':`<p class="note">Le journal est vide : la courbe démarrera avec vos premières séances.</p>`)}
+  return h;
+}
+
+const sideTag=s=>/ACHAT|LONG|achat/.test(s)?`<span class="side b">${s}</span>`:/VENTE|SHORT|vente/.test(s)?`<span class="side s">${s}</span>`:s;
+function recent(){
+  const f=S.id==='orb'?fwdDays().filter(x=>x.row.sens!=='aucun').slice(-15).reverse():[];
+  if(f.length) return `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Sens</th><th>Entrée</th><th>Stop</th><th>Sortie</th><th>Raison</th><th>R théorique</th><th>Pts réels</th><th>Glissement</th></tr></thead><tbody>`
+    +f.map(x=>{const r=x.row,sl=r.reel_pts===''?null:(+r.reel_pts)-(+r.pts_brut);
+      return `<tr><td>${r.date}</td><td>${sideTag(r.sens)}</td><td>${r.entree}</td><td>${r.stop}</td><td>${r.sortie}</td><td>${r.raison}</td>
+      <td class="r-chip ${cls(x.R)}">${fmt(x.R,2)}</td><td>${r.reel_pts||'—'}</td><td class="${sl===null?'mut':cls(sl)}">${sl===null?'—':fmt(sl,2)}</td></tr>`}).join('')+'</tbody></table></div>';
+  if(!S.recent.length) return `<div class="empty-state">Pas de détail de trades pour cette stratégie.</div>`;
+  return `<p class="sub">${S.id==='orb'?'Journal vide : derniers trades du backtest':'Derniers trades du backtest'}</p>
+  <div class="table-wrap"><table><thead><tr><th>Date</th><th>Sens</th><th>Entrée</th><th>Risque (pts)</th><th>Sortie</th><th>R</th></tr></thead><tbody>`
+  +S.recent.slice(0,15).map(t=>`<tr><td>${t.date}</td><td>${sideTag(t.sens)}</td><td>${fr(t.entree,2)}</td><td>${fr(t.risque_pts,1)}</td><td>${t.sortie_h}</td><td class="r-chip ${cls(t.R)}">${fmt(t.R,2)}</td></tr>`).join('')+'</tbody></table></div>';
+}
+
+function prop(){
+  if(!S.lucid) return '';
+  const L=S.lucid[risk],c=L.causes;
+  const paths=L.paths.map(p=>({pts:p.map((v,i)=>[i,v]),c:p[p.length-1]>=1250?'var(--green)':p.length>=500?'var(--muted)':'var(--red)',w:1.2,o:.4}));
+  const card=(v,l,x='')=>`<div class="kpi"><span>${l}</span><b class="num ${x}">${v}</b></div>`;
+  return `<section class="card"><div class="card-h"><h2>Simulateur LucidFlex 25K</h2><span class="sp"></span><span class="seg">${D.risks.map(r=>`<button class="rk ${r===risk?'on':''}" data-r="${r}">${r} $ / trade</button>`).join('')}</span></div>
+  <div class="kpis">${card(fr(L.pass*100,1)+' %','Évaluations réussies')+card(L.days_median?Math.round(L.days_median)+' j':'—','Durée médiane si réussite')
+    +card(fr(Math.round(L.cash))+' $','Encaissé en moyenne, financé')+card((L.one_payout*100).toFixed(0)+' %','Comptes avec ≥ 1 retrait')
+    +card(fmt(L.ev,0)+' $','Valeur par tentative à 39 $',cls(L.ev))}</div>
+  <div class="grid2" style="margin-top:20px"><div><p class="sub">60 évaluations simulées (solde en $, séances tirées par blocs de 5 jours)</p>
+   ${chart({series:paths,h:250,yfmt:v=>fr(v)+' $',hlines:[{y:1250,c:'var(--green)',t:'objectif +1 250 $'},{y:-1000,c:'var(--red)',t:'perte max initiale'}]})}</div>
+   <div><p class="sub">Comment finissent les évaluations</p>
+   <div class="bar"><div style="width:${c['réussite']*100}%;background:var(--green)">${(c['réussite']*100).toFixed(0)} %</div>
+   <div style="width:${c['perte max']*100}%;background:var(--red)">${(c['perte max']*100).toFixed(0)} %</div>
+   <div style="width:${c['délai dépassé']*100}%;background:var(--muted)"></div></div>
+   <div class="legend"><span><i style="background:var(--green)"></i>réussite</span><span><i style="background:var(--red)"></i>perte max touchée</span><span><i style="background:var(--muted)"></i>délai (500 séances) dépassé</span></div>
+   <p class="note">Règles : objectif +1 250 $, perte max 1 000 $ fin de journée bloquée à +100 $ dès +1 100 $, perte journalière 600 $, consistance 40 %.
+   Financé : retrait si 5 jours ≥ 100 $, min(50 % du profit, 1 000 $) ≥ 500 $, 90 % pour vous, 5 retraits max, 10 micros sous 1 000 $ de profit.
+   En moyenne ${fr(L.dll_days,2)} journée(s) par évaluation dépasse la perte journalière (journée coupée à −600 $).</p>
+   <p class="note">Simulation sur les séances 2021-2026 : ce n'est pas une promesse, ni un conseil d'investissement.</p></div></div></section>`;
+}
+
+function render(){
+  nav();charts=[];
+  $('#main').innerHTML=hero()+kpis()
+  +`<section class="card"><div class="card-h"><h2>Règles</h2></div><ol class="rules">${S.rules.map((r,i)=>`<li><i>${i+1}</i><span>${r}</span></li>`).join('')}</ol></section>
+  <section class="card"><div class="card-h"><h2>Calendrier</h2><span class="sp"></span>${S.id==='orb'?`<span class="seg"><button class="cs ${calSrc==='bt'?'on':''}" data-s="bt">Backtest</button><button class="cs ${calSrc==='fw'?'on':''}" data-s="fw">Paper trading</button></span>`:''}</div>${calendar()}</section>
+  <section class="card"><div class="card-h"><h2>Performances</h2></div>${perf()}</section>
+  <section class="card"><div class="card-h"><h2>Trades récents</h2></div>${recent()}</section>${prop()}
+  <footer>Résultats de backtest et de simulation : ils ne garantissent pas les résultats futurs. Ce n'est pas un conseil d'investissement.</footer>`;
+  drawAll();
+  const pm=$('#pm'),nm=$('#nm');
+  const months=[...new Set((calSrc==='fw'?fwdDays().map(x=>[x.d]):S.series).map(r=>r[0].slice(0,7)))].sort();
+  if(pm) pm.onclick=()=>{calMonth=months[months.indexOf(calMonth)-1];render()};
+  if(nm) nm.onclick=()=>{calMonth=months[months.indexOf(calMonth)+1];render()};
+  document.querySelectorAll('.cs').forEach(b=>b.onclick=()=>{calSrc=b.dataset.s;calMonth=null;render()});
+  document.querySelectorAll('.rk').forEach(b=>b.onclick=()=>{risk=b.dataset.r;render()});
+}
+let rz;addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(drawAll,120)});
+render();
+</script>
+<!-- Verre liquide discret sur la barre du haut (Chrome, Edge, Samsung Internet ; les autres navigateurs gardent le flou CSS).
+     Moteur : liquid-glass.js (kit liquid-glass-web), recopié ici pour que la page reste un seul fichier. -->
+<script type="module">
+// ---- liquid-glass.js ----
+/**
+ * liquid-glass.js v1.0.0 — refractive "liquid glass" for the web that renders the same in Chromium,
+ * WebKit (Safari, every iOS browser) and Gecko (Firefox).
+ *
+ * The glass bends the element's OWN rendered pixels with an SVG feDisplacementMap referenced from
+ * CSS `filter: url(#…)`. `backdrop-filter: url(#…)` would be simpler but only Chromium renders it,
+ * so it is offered only as an opt-in enhancement (mode: 'backdrop').
+ *
+ * The displacement map is a small PNG generated at runtime from the lens shape: red/green hold the
+ * horizontal/vertical bend, blue holds the rim highlight, alpha is the lens coverage. Outside the lens
+ * the source passes through untouched, so text stays crisp, selectable and clickable.
+ *
+ * No dependencies. ES module.
+ */
+
+const NS = 'http://www.w3.org/2000/svg';
+const XLINK = 'http://www.w3.org/1999/xlink';
+const NEUTRAL = 128;
+const MAP_CACHE_SIZE = 48;
+
+const DEFAULTS = Object.freeze({
+  // Lens rectangle in CSS px, relative to the filtered element's border box.
+  x: 0,
+  y: 0,
+  width: 120,
+  height: 64,
+  radius: 32,
+  // Optics.
+  refraction: 18, // maximum bend at the rim, CSS px
+  bezel: 0.6, // curved rim width as a fraction of the lens half-size (min side); 1 = full dome
+  curvature: 4, // rim profile exponent: 2 = circular, 4 = squircle-like, higher = steeper rim
+  ior: 1.5, // index of refraction; shapes how quickly the bend fades from the rim inward
+  invert: false, // false = convex lens (magnifies), true = concave (content pushed outward)
+  chroma: 0.12, // colour fringe; blue bends (1 + chroma)x as far as red. 0 skips the extra passes
+  blur: 0, // frost, CSS px
+  specular: 0.45, // rim highlight 0..1. 0 skips the pass
+  specularWidth: 2, // rim highlight width, CSS px
+  lightAngle: -120, // degrees; 0 = light from the right, -90 = from the top. The lit rim is brightest, the far rim reflects dimly
+  mapScale: 0, // map pixels per CSS px; 0 = devicePixelRatio capped at 2
+});
+
+// Keys that change the displacement map itself. Everything else (position, strength) is a cheap
+// attribute update on an existing filter.
+const MAP_KEYS = ['width', 'height', 'radius', 'bezel', 'curvature', 'ior', 'invert', 'specular', 'specularWidth', 'lightAngle'];
+
+const engine = detectEngine();
+
+function detectEngine() {
+  if (typeof navigator === 'undefined') return 'unknown';
+  const brands = navigator.userAgentData?.brands;
+  if (brands?.some((b) => /Chromium/.test(b.brand))) return 'blink';
+  const ua = navigator.userAgent;
+  if (/Firefox\//.test(ua)) return 'gecko';
+  // Every iOS browser is WebKit; their UAs carry CriOS/FxiOS rather than Chrome/Firefox.
+  if (/AppleWebKit\//.test(ua) && !/Chrome\/|Chromium\/|Edg\//.test(ua)) return 'webkit';
+  return /Chrome\//.test(ua) ? 'blink' : 'unknown';
+}
+
+/* ------------------------------------------------------------------------------------------------ */
+/* Displacement map                                                                                   */
+/* ------------------------------------------------------------------------------------------------ */
+
+const profileCache = new Map();
+
+// Normalised bend m(s) for s = (distance from rim) / bezel in [0, 1], tabulated once per optics.
+// The glass surface height is h(s) = (1 - (1 - s)^k)^(1/k). A vertical ray hitting a surface tilted
+// by theta refracts to asin(sin(theta) / ior); the lateral offset grows with tan(theta - refracted).
+function profileTable(curvature, ior) {
+  const key = `${curvature}|${ior}`;
+  let table = profileCache.get(key);
+  if (table) return table;
+  const N = 512;
+  table = new Float32Array(N + 1);
+  let max = 0;
+  for (let i = 0; i <= N; i++) {
+    const s = Math.min(i / N, 1 - 1e-6);
+    const a = Math.pow(1 - s, curvature);
+    const slope = Math.pow(1 - s, curvature - 1) * Math.pow(Math.max(1 - a, 1e-9), 1 / curvature - 1);
+    const theta = Math.atan(slope);
+    const refracted = Math.asin(Math.sin(theta) / ior);
+    const bend = Math.tan(theta - refracted);
+    table[i] = bend;
+    if (bend > max) max = bend;
+  }
+  for (let i = 0; i <= N; i++) table[i] /= max || 1;
+  table[N] = 0;
+  profileCache.set(key, table);
+  return table;
+}
+
+/**
+ * Paint the displacement map for a lens into a canvas.
+ * Returns { canvas, width, height, scale } — usable by the SVG path (as a data URL) and by WebGL
+ * (as a texture), so both renderers share one optical model.
+ */
+function renderLensMap(options = {}, scale = 1) {
+  const p = { ...DEFAULTS, ...options };
+  const w = Math.max(2, Math.round(p.width * scale));
+  const h = Math.max(2, Math.round(p.height * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  const image = ctx.createImageData(w, h);
+  const px = image.data;
+
+  const sx = p.width / w; // CSS px per map pixel (x); equals 1 / scale up to rounding
+  const sy = p.height / h;
+  const hw = p.width / 2;
+  const hh = p.height / 2;
+  const r = Math.max(0, Math.min(p.radius, hw, hh));
+  const bezel = Math.max(0.5, p.bezel * Math.min(hw, hh));
+  const table = profileTable(p.curvature, p.ior);
+  const N = table.length - 1;
+  const rimWidth = Math.max(0.5, p.specularWidth);
+  const aa = Math.max(sx, sy); // one map pixel of anti-aliasing at the rim
+  const angle = (p.lightAngle * Math.PI) / 180;
+  const lx = Math.cos(angle);
+  const ly = Math.sin(angle);
+  const dir = p.invert ? -1 : 1;
+
+  // The rounded rectangle is symmetric in both axes: compute the top-left quadrant only and mirror
+  // it, flipping the sign of the x bend across the vertical axis and of the y bend across the
+  // horizontal axis. This keeps per-frame regeneration (squish, resize) inside the frame budget.
+  const qw = Math.ceil(w / 2);
+  const qh = Math.ceil(h / 2);
+  for (let j = 0; j < qh; j++) {
+    const y = (j + 0.5) * sy - hh; // <= 0
+    for (let i = 0; i < qw; i++) {
+      const x = (i + 0.5) * sx - hw; // <= 0
+      // Signed distance to the rounded rectangle, evaluated on |p|.
+      const qx = -x - (hw - r);
+      const qy = -y - (hh - r);
+      const ox = Math.max(qx, 0);
+      const oy = Math.max(qy, 0);
+      const corner = Math.hypot(ox, oy);
+      const dist = corner + Math.min(Math.max(qx, qy), 0) - r; // < 0 inside
+      const alpha = Math.min(1, Math.max(0, 0.5 - dist / aa));
+      if (alpha <= 0) continue; // transparent: composited over neutral grey in the filter
+
+      // Outward normal on |p| (points away from the centre).
+      let nx;
+      let ny;
+      if (qx > 0 && qy > 0) {
+        nx = ox / corner;
+        ny = oy / corner;
+      } else if (qx > qy) {
+        nx = 1;
+        ny = 0;
+      } else {
+        nx = 0;
+        ny = 1;
+      }
+
+      const inset = Math.max(0, -dist);
+      const s = inset / bezel;
+      const m = s >= 1 ? 0 : table[Math.min(N, Math.round(s * N))];
+      // Convex glass samples from further inside (towards the centre) near the rim.
+      const bx = Math.round(127 * m * nx * dir);
+      const by = Math.round(127 * m * ny * dir);
+
+      // Rim highlight: a crisp line plus a softer inner glow, brightest where the rim faces the
+      // light, with a dimmer reflection on the far side.
+      const crisp = Math.max(0, 1 - inset / rimWidth);
+      const glow = Math.max(0, 1 - inset / (rimWidth * 5));
+      const rim = p.specular * (crisp * crisp + 0.3 * glow * glow);
+      const a = Math.round(alpha * 255);
+
+      const i2 = w - 1 - i;
+      const j2 = h - 1 - j;
+      // top-left: outward normal (-nx, -ny); sample towards +x/+y (inward)
+      write(px, (j * w + i) * 4, NEUTRAL + bx, NEUTRAL + by, rimLight(rim, -nx * lx - ny * ly), a);
+      if (i2 !== i) write(px, (j * w + i2) * 4, NEUTRAL - bx, NEUTRAL + by, rimLight(rim, nx * lx - ny * ly), a);
+      if (j2 !== j) write(px, (j2 * w + i) * 4, NEUTRAL + bx, NEUTRAL - by, rimLight(rim, -nx * lx + ny * ly), a);
+      if (i2 !== i && j2 !== j) write(px, (j2 * w + i2) * 4, NEUTRAL - bx, NEUTRAL - by, rimLight(rim, nx * lx + ny * ly), a);
+    }
+  }
+  ctx.putImageData(image, 0, 0);
+  return { canvas, width: w, height: h, scale };
+}
+
+// Blue channel for a rim pixel: `facing` is n·L for its outward normal.
+function rimLight(rim, facing) {
+  const shade = 0.12 + 0.88 * (facing > 0 ? facing : -0.4 * facing);
+  return NEUTRAL + Math.round(127 * Math.min(1, rim * shade));
+}
+
+function write(px, o, r, g, b, a) {
+  px[o] = r;
+  px[o + 1] = g;
+  px[o + 2] = b;
+  px[o + 3] = a;
+}
+
+const mapCache = new Map();
+
+function mapKeyOf(p, scale) {
+  return MAP_KEYS.map((k) => p[k]).join('|') + '|' + scale;
+}
+
+// Returns { key, url, decoded, ready }. The PNG is decoded through an <img> before the filter uses
+// it: feImage loads data URLs asynchronously, and WebKit caches whatever the filter produced while
+// the image was still missing (an empty result) until the filter id changes.
+function lensMap(p, scale, key) {
+  let entry = mapCache.get(key);
+  if (entry) {
+    mapCache.delete(key); // refresh LRU position
+  } else {
+    const url = renderLensMap(p, scale).canvas.toDataURL('image/png');
+    entry = { key, url, decoded: false, ready: null };
+    const img = new Image();
+    img.src = url;
+    entry.ready = img
+      .decode()
+      .catch(() => {})
+      .then(() => {
+        entry.decoded = true;
+      });
+    if (mapCache.size >= MAP_CACHE_SIZE) mapCache.delete(mapCache.keys().next().value);
+  }
+  mapCache.set(key, entry);
+  return entry;
+}
+
+/* ------------------------------------------------------------------------------------------------ */
+/* SVG filter                                                                                         */
+/* ------------------------------------------------------------------------------------------------ */
+
+let svgRoot = null;
+
+function defsNode() {
+  if (svgRoot?.isConnected) return svgRoot.firstChild;
+  svgRoot = document.createElementNS(NS, 'svg');
+  svgRoot.setAttribute('aria-hidden', 'true');
+  svgRoot.setAttribute('width', '0');
+  svgRoot.setAttribute('height', '0');
+  // Not display:none — filters inside a display:none <svg> stop resolving in some engines.
+  svgRoot.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;pointer-events:none';
+  svgRoot.appendChild(document.createElementNS(NS, 'defs'));
+  document.body.appendChild(svgRoot);
+  return svgRoot.firstChild;
+}
+
+function node(name, attrs) {
+  const n = document.createElementNS(NS, name);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  return n;
+}
+
+const CHANNELS = [
+  '1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0',
+  '0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0',
+  '0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0',
+];
+
+// Filter graph (all coordinates are fractions of the element box — see bendScale):
+//   map        = lens PNG over neutral grey (128 = no bend), only inside the lens rect
+//   bend       = map with R/G squeezed towards 128 where the engine scales x and y differently
+//   refracted  = feDisplacementMap(source, bend)           (x3 with per-channel scale when chroma > 0)
+//   lit        = refracted + white * (2 * map.b - 1)        (rim highlight from the blue channel)
+//   result     = (lit IN lensShape) OVER (source OUT lensShape)
+function buildGraph(filter, p) {
+  filter.replaceChildren();
+  const lensRect = [];
+  const add = (name, attrs, inLens) => {
+    const n = node(name, attrs);
+    filter.appendChild(n);
+    if (inLens) lensRect.push(n);
+    return n;
+  };
+
+  add('feFlood', { 'flood-color': 'rgb(128,128,128)', 'flood-opacity': '1', result: 'neutral' }, true);
+  const image = add('feImage', { preserveAspectRatio: 'none', result: 'lensShape' }, true);
+  add('feComposite', { in: 'lensShape', in2: 'neutral', operator: 'over', result: 'map' }, true);
+  const aspect = engine === 'webkit' ? add('feColorMatrix', { in: 'map', type: 'matrix', result: 'bend' }, true) : null;
+  const bendMap = aspect ? 'bend' : 'map';
+
+  let source = 'SourceGraphic';
+  let blur = null;
+  if (p.blur > 0) {
+    blur = add('feGaussianBlur', { in: 'SourceGraphic', result: 'frosted' });
+    source = 'frosted';
+  }
+
+  const displace = [];
+  if (p.chroma > 0) {
+    CHANNELS.forEach((values, i) => {
+      displace.push(add('feDisplacementMap', { in: source, in2: bendMap, xChannelSelector: 'R', yChannelSelector: 'G' }, true));
+      add('feColorMatrix', { type: 'matrix', values, result: `ch${i}` }, true);
+    });
+    // Premultiplied sum: exact for opaque content, which is why the glass surface needs a background.
+    add('feComposite', { in: 'ch0', in2: 'ch1', operator: 'arithmetic', k1: 0, k2: 1, k3: 1, k4: 0, result: 'rg' }, true);
+    add('feComposite', { in: 'rg', in2: 'ch2', operator: 'arithmetic', k1: 0, k2: 1, k3: 1, k4: 0, result: 'refracted' }, true);
+  } else {
+    displace.push(
+      add('feDisplacementMap', { in: source, in2: bendMap, xChannelSelector: 'R', yChannelSelector: 'G', result: 'refracted' }, true),
+    );
+  }
+
+  let lit = 'refracted';
+  if (p.specular > 0) {
+    add('feColorMatrix', { in: 'map', type: 'matrix', values: `0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 2 0 ${-(2 * NEUTRAL) / 255}`, result: 'rim' }, true);
+    add('feComposite', { in: 'rim', in2: 'refracted', operator: 'arithmetic', k1: 0, k2: 1, k3: 1, k4: 0, result: 'lit' }, true);
+    lit = 'lit';
+  }
+
+  add('feComposite', { in: lit, in2: 'lensShape', operator: 'in', result: 'lens' }, true);
+  add('feComposite', { in: 'SourceGraphic', in2: 'lensShape', operator: 'out', result: 'outside' });
+  add('feComposite', { in: 'lens', in2: 'outside', operator: 'over' });
+  return { image, aspect, blur, displace, lensRect };
+}
+
+// With primitiveUnits="objectBoundingBox" (the only units WebKit renders — userSpaceOnUse turns the
+// whole element blank), feDisplacementMap's `scale` is a fraction of the box, and each engine turns
+// it into pixels differently (measured):
+//   Blink:  x and y both use width
+//   WebKit: x uses width, y uses height
+//   Gecko:  x and y both use sqrt((w^2 + h^2) / 2)
+// Returns the `scale` that bends `px` pixels on both axes, plus per-axis factors (<= 1) that squeeze
+// the map's R/G channels where the engine would otherwise over-bend one axis.
+function bendScale(px, w, h) {
+  if (engine === 'webkit') {
+    const m = Math.min(w, h);
+    return { scale: (2 * px) / m, kx: m / w, ky: m / h };
+  }
+  if (engine === 'gecko') return { scale: (2 * px) / Math.sqrt((w * w + h * h) / 2), kx: 1, ky: 1 };
+  return { scale: (2 * px) / w, kx: 1, ky: 1 };
+}
+
+function setRect(n, x, y, w, h) {
+  n.setAttribute('x', x);
+  n.setAttribute('y', y);
+  n.setAttribute('width', w);
+  n.setAttribute('height', h);
+}
+
+/* ------------------------------------------------------------------------------------------------ */
+/* Controller                                                                                         */
+/* ------------------------------------------------------------------------------------------------ */
+
+let uid = 0;
+
+/**
+ * Put a glass lens on `target`.
+ *
+ * mode 'content' (default): bends target's own pixels. Works everywhere. Put the thing to refract
+ *   INSIDE target (or a decorative copy of it — see references/patterns.md).
+ * mode 'backdrop': bends what is behind target via `backdrop-filter: url()`. Chromium only; other
+ *   engines get `fallback` (a plain CSS backdrop-filter) instead.
+ *
+ * Options: everything in DEFAULTS, plus
+ *   fit: true       lens follows target's own size (x = y = 0, width/height = border box)
+ *   clip: true      clip target to the lens shape (overlay-copy pattern)
+ *   fallback: str   backdrop-filter used by mode 'backdrop' outside Chromium
+ *   sync: true      apply updates immediately instead of on the next animation frame
+ *   hidden: true    no lens at all (filter removed; with clip, the element is clipped away).
+ *                   Toggle with update({ hidden }) — e.g. a magnifier when the pointer leaves
+ *
+ * Lens coordinates are CSS px relative to target's border box; they are converted to fractions of
+ * that box internally, and the filter output is clipped to it.
+ */
+function createGlass(target, options = {}) {
+  const base = `lg${++uid}`;
+  const mode = options.mode ?? 'content';
+  const fallback = options.fallback ?? 'blur(12px) saturate(1.6)';
+  const p = { ...DEFAULTS, ...pick(options) };
+  const flags = { fit: !!options.fit, clip: !!options.clip, sync: !!options.sync, hidden: !!options.hidden };
+  const useBackdropURL = mode === 'backdrop' && engine === 'blink';
+  const active = mode !== 'backdrop' || useBackdropURL;
+
+  if (!active) {
+    target.style.backdropFilter = fallback;
+    target.style.webkitBackdropFilter = fallback;
+  }
+
+  const filter = node('filter', {
+    filterUnits: 'objectBoundingBox',
+    x: 0,
+    y: 0,
+    width: 1,
+    height: 1,
+    primitiveUnits: 'objectBoundingBox',
+    // sRGB keeps 128 meaning "no bend"; the default linearRGB would shift every pixel.
+    'color-interpolation-filters': 'sRGB',
+  });
+  if (active) defsNode().appendChild(filter);
+
+  let graph = null;
+  let structure = '';
+  let wanted = ''; // key of the newest map requested
+  let requested = 0; // request counter, so a slow decode never replaces a newer map
+  let shown = { key: '', seq: -1 }; // map currently referenced by feImage
+  let version = 0;
+  let frame = 0;
+  let settleTimers = [];
+  let destroyed = false;
+  let box = { width: target.offsetWidth, height: target.offsetHeight };
+
+  // Filter coordinates are fractions of the element box, so every resize has to re-flush.
+  const observer = active
+    ? new ResizeObserver(() => {
+        box = { width: target.offsetWidth, height: target.offsetHeight };
+        schedule();
+      })
+    : null;
+  observer?.observe(target);
+
+  // Re-issue the filter id shortly after a map swap: WebKit loads its own copy of the data URL and
+  // does not repaint the filter when that load lands.
+  function settle() {
+    settleTimers.forEach(clearTimeout);
+    settleTimers = [60, 250].map((ms) => setTimeout(schedule, ms));
+  }
+
+  function show(entry, seq) {
+    if (seq <= shown.seq || !graph) return false;
+    graph.image.setAttribute('href', entry.url);
+    graph.image.setAttributeNS(XLINK, 'xlink:href', entry.url);
+    shown = { key: entry.key, seq };
+    settle();
+    return true;
+  }
+
+  function flush() {
+    frame = 0;
+    if (destroyed || !active) return;
+    if (flags.hidden) {
+      if (useBackdropURL) target.style.backdropFilter = '';
+      else target.style.filter = '';
+      if (flags.clip) target.style.clipPath = 'inset(50%)';
+      return;
+    }
+    const W = box.width;
+    const H = box.height;
+    if (W < 1 || H < 1) return; // not laid out yet; the ResizeObserver will call back
+    if (flags.fit) {
+      p.x = 0;
+      p.y = 0;
+      p.width = W;
+      p.height = H;
+    }
+    if (p.width < 1 || p.height < 1) return;
+
+    const s = `${p.chroma > 0}|${p.blur > 0}|${p.specular > 0}`;
+    if (s !== structure) {
+      graph = buildGraph(filter, p);
+      structure = s;
+      shown = { key: '', seq: -1 };
+      wanted = '';
+    }
+
+    const dpr = window.devicePixelRatio || 1;
+    const scale = p.mapScale > 0 ? p.mapScale : Math.min(dpr, 2);
+    // Snap the lens to device pixels: fractional sub-regions shimmer while the lens moves.
+    const snap = (v) => Math.round(v * dpr) / dpr;
+    const x = snap(p.x);
+    const y = snap(p.y);
+    const w = snap(p.width);
+    const h = snap(p.height);
+
+    const key = mapKeyOf(p, scale);
+    if (wanted !== key) {
+      wanted = key;
+      const entry = lensMap(p, scale, key);
+      const seq = ++requested;
+      if (entry.decoded) show(entry, seq);
+      // While a squish animation requests a new map every frame, show the newest map that has
+      // finished decoding (stretched to the current rect) instead of waiting for the latest one.
+      else entry.ready.then(() => !destroyed && show(entry, seq) && schedule());
+    }
+    if (flags.clip) {
+      const r = Math.min(p.radius, w / 2, h / 2);
+      target.style.clipPath = `inset(${y}px ${W - x - w}px ${H - y - h}px ${x}px round ${r}px)`;
+    }
+    if (!shown.key) return; // first map not ready yet: leave the element unfiltered
+
+    for (const n of graph.lensRect) setRect(n, x / W, y / H, w / W, h / H);
+    const { scale: k, kx, ky } = bendScale(p.refraction, W, H);
+    const scales = graph.displace.length === 3 ? [k, k * (1 + p.chroma / 2), k * (1 + p.chroma)] : [k];
+    graph.displace.forEach((n, i) => n.setAttribute('scale', scales[i]));
+    if (graph.aspect) {
+      graph.aspect.setAttribute('values', `${kx} 0 0 0 ${(1 - kx) / 2}  0 ${ky} 0 0 ${(1 - ky) / 2}  0 0 1 0 0  0 0 0 1 0`);
+    }
+    if (graph.blur) {
+      graph.blur.setAttribute('stdDeviation', `${p.blur / W} ${p.blur / H}`);
+      const pad = Math.ceil(p.refraction * (1 + p.chroma) + 3 * p.blur);
+      setRect(graph.blur, (x - pad) / W, (y - pad) / H, (w + 2 * pad) / W, (h + 2 * pad) / H);
+    }
+
+    // WebKit caches filter output per filter id and keeps serving it after the graph changes;
+    // a fresh id on every update forces it to re-read.
+    filter.id = `${base}-v${++version}`;
+    const ref = `url(#${filter.id})`;
+    if (useBackdropURL) target.style.backdropFilter = ref;
+    else target.style.filter = ref;
+  }
+
+  function schedule() {
+    if (flags.sync) flush();
+    else if (!frame) frame = requestAnimationFrame(flush);
+  }
+
+  schedule();
+
+  return {
+    /** Merge new lens geometry / optics. Moving the lens never regenerates the map. */
+    update(next = {}) {
+      const changes = pick(next);
+      const hidden = next.hidden === undefined ? flags.hidden : !!next.hidden;
+      // Skip no-op updates: every flush re-issues the filter id, which repaints the glass.
+      if (hidden === flags.hidden && Object.keys(changes).every((k) => changes[k] === p[k])) return;
+      Object.assign(p, changes);
+      flags.hidden = hidden;
+      schedule();
+    },
+    /** Apply pending changes now (e.g. before measuring or taking a screenshot). */
+    flush() {
+      if (frame) cancelAnimationFrame(frame);
+      flush();
+    },
+    get params() {
+      return { ...p };
+    },
+    get filterId() {
+      return filter.id;
+    },
+    destroy() {
+      destroyed = true;
+      if (frame) cancelAnimationFrame(frame);
+      settleTimers.forEach(clearTimeout);
+      observer?.disconnect();
+      filter.remove();
+      target.style.filter = '';
+      target.style.backdropFilter = '';
+      target.style.webkitBackdropFilter = '';
+      if (flags.clip) target.style.clipPath = '';
+    },
+  };
+}
+
+function pick(o) {
+  const out = {};
+  for (const k in DEFAULTS) if (o[k] !== undefined) out[k] = o[k];
+  return out;
+}
+
+/* ------------------------------------------------------------------------------------------------ */
+/* Motion                                                                                             */
+/* ------------------------------------------------------------------------------------------------ */
+
+const reducedMotion =
+  typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
+
+/**
+ * Critically-damped-ish spring for lens position and squish. `onUpdate(value, velocity)` runs every
+ * frame until the spring settles. Honors prefers-reduced-motion by jumping straight to the target.
+ */
+function createSpring(initial, onUpdate, { stiffness = 520, damping = 38, mass = 1 } = {}) {
+  let value = initial;
+  let velocity = 0;
+  let target = initial;
+  let frame = 0;
+  let last = 0;
+
+  function step(now) {
+    // Fixed 1/120 s sub-steps: the animation keeps its duration when frames are slow or throttled,
+    // and one long frame (a background tab coming back) cannot blow the integration up.
+    let remaining = Math.min(0.1, (now - last) / 1000 || 1 / 60);
+    last = now;
+    while (remaining > 1e-6) {
+      const dt = Math.min(1 / 120, remaining);
+      const force = -stiffness * (value - target) - damping * velocity;
+      velocity += (force / mass) * dt;
+      value += velocity * dt;
+      remaining -= dt;
+    }
+    if (Math.abs(velocity) < 0.01 && Math.abs(value - target) < 0.01) {
+      value = target;
+      velocity = 0;
+      frame = 0;
+      onUpdate(value, 0);
+      return;
+    }
+    onUpdate(value, velocity);
+    frame = requestAnimationFrame(step);
+  }
+
+  return {
+    set(next, { immediate = false } = {}) {
+      target = next;
+      if (immediate || reducedMotion.matches) {
+        if (frame) cancelAnimationFrame(frame);
+        frame = 0;
+        value = next;
+        velocity = 0;
+        onUpdate(value, 0);
+        return;
+      }
+      if (!frame) {
+        last = performance.now();
+        frame = requestAnimationFrame(step);
+      }
+    },
+    get value() {
+      return value;
+    },
+    get target() {
+      return target;
+    },
+    stop() {
+      if (frame) cancelAnimationFrame(frame);
+      frame = 0;
+    },
+  };
+}
+// ---- réglage doux (verre-liquide.js) ----
+// Effet volontairement discret : le verre courbe surtout le bord, le centre reste net et lisible.
+const REGLAGES = {
+  doux: { refraction: 10, bezel: 0.3, curvature: 4, chroma: 0, specular: 0.2, specularWidth: 1 },
+  fort: { refraction: 18, bezel: 0.45, curvature: 4, chroma: 0.08, specular: 0.32, specularWidth: 1.5 },
+};
+
+const actif =
+  engine === 'blink' &&
+  !matchMedia('(prefers-reduced-transparency: reduce)').matches &&
+  !matchMedia('(prefers-contrast: more)').matches;
+
+const cibles = [];
+
+function poser(el, o) {
+  if (el.__verre) return;
+  const cs = getComputedStyle(el);
+  // Le flou du CSS est repris dans le filtre (plafonné, sinon on ne voit plus la courbure).
+  const flou = /blur\(([\d.]+)px\)/.exec(cs.backdropFilter || '');
+  const visible = () => !o.si || el.classList.contains(o.si);
+  const glass = createGlass(el, {
+    mode: 'backdrop',
+    fit: true,
+    radius: parseFloat(cs.borderTopLeftRadius) || 0,
+    blur: o.flou ?? (flou ? Math.min(+flou[1], 6) : 0),
+    hidden: !visible(),
+    ...REGLAGES[o.reglage || 'doux'],
+  });
+  el.__verre = glass;
+  el.classList.add('verre-liquide');
+  // Le rayon peut changer avec la taille de l'écran (media queries).
+  new ResizeObserver(() => glass.update({ radius: parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0 })).observe(el);
+  if (o.si) new MutationObserver(() => glass.update({ hidden: !visible() })).observe(el, { attributes: true, attributeFilter: ['class'] });
+}
+
+function chercher() {
+  for (const [sel, o] of cibles) document.querySelectorAll(sel).forEach((el) => poser(el, o));
+}
+
+function verre(selecteur, options = {}) {
+  if (!actif) return;
+  cibles.push([selecteur, options]);
+  chercher();
+}
+
+if (actif) {
+  // Certains éléments (barre d'onglets, fenêtres) sont créés après le chargement.
+  let attente = 0;
+  const plusTard = () => attente || (attente = requestAnimationFrame(() => ((attente = 0), chercher())));
+  new MutationObserver(plusTard).observe(document.documentElement, { childList: true, subtree: true });
+  addEventListener('load', chercher);
+}
+verre('.topbar');
+</script>
+</body></html>

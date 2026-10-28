@@ -1,0 +1,19 @@
+# Données de marché (volumineuses, re-téléchargeables) et clé API Alpha Vantage (data/.av_key)
+data/
+.av_key
+*.key
+.env
+
+# Page générée par dashboard.py (contient toutes les données ; à régénérer en local)
+dashboard.html
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Système
+.DS_Store
+Thumbs.db
+desktop.ini
